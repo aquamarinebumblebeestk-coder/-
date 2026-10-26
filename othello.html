@@ -19,19 +19,37 @@
   })();
 </script>
 <style>
-  body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
-  #board { display: grid; grid-template-columns: repeat(8, 40px); gap: 2px; background: #333; padding: 2px; }
-  .cell { width: 40px; height: 40px; background: #2e8b57; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-  .cell.hint::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: rgba(0,0,0,.3); }
-  .disc { width: 32px; height: 32px; border-radius: 50%; }
-  .b { background: #000; }
-  .w { background: #fff; }
+  :root { --bg: #0b0d17; --card: rgba(255,255,255,.04); --line: rgba(255,255,255,.1); --text: #e8eaf2; --muted: #8b90a7; --accent: linear-gradient(135deg, #7c5cff, #00d4ff); }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: system-ui, -apple-system, "Hiragino Sans", sans-serif; color: var(--text);
+    background: radial-gradient(circle at 20% 0%, #2a1d6b 0, transparent 45%), radial-gradient(circle at 90% 100%, #00475e 0, transparent 40%), var(--bg);
+    display: flex; flex-direction: column; align-items: center; padding: 32px 16px; }
+  .hero { width: min(320px, 80vw); opacity: .85; -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
+  h1 { margin: 0 0 16px; font-size: clamp(28px, 7vw, 40px); letter-spacing: .08em; background: var(--accent); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #status { margin: 0 0 16px; padding: 8px 18px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 14px; }
+  #board { --s: min(44px, calc((100vw - 52px) / 8)); display: grid; grid-template-columns: repeat(8, var(--s)); gap: 2px; padding: 8px; border-radius: 16px;
+    background: rgba(0,212,255,.25); box-shadow: 0 0 40px rgba(0,212,255,.25), 0 20px 50px rgba(0,0,0,.5); }
+  .cell { width: var(--s); height: var(--s); background: linear-gradient(135deg, #134232, #0b2a1f); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .2s; }
+  .cell:first-child { border-top-left-radius: 10px; } .cell:nth-child(8) { border-top-right-radius: 10px; }
+  .cell:nth-child(57) { border-bottom-left-radius: 10px; } .cell:last-child { border-bottom-right-radius: 10px; }
+  .cell.hint:hover { background: linear-gradient(135deg, #1d5c46, #12392b); }
+  .cell.hint::after { content: ''; width: 25%; height: 25%; border-radius: 50%; background: rgba(0,212,255,.45); box-shadow: 0 0 8px #00d4ff; }
+  .disc { width: 80%; height: 80%; border-radius: 50%; }
+  .b { background: radial-gradient(circle at 35% 30%, #5a5f78, #14161f 55%, #05060a); box-shadow: 0 3px 6px rgba(0,0,0,.6); }
+  .w { background: radial-gradient(circle at 35% 30%, #fff, #d9dcea 55%, #9097b3); box-shadow: 0 3px 6px rgba(0,0,0,.6); }
+  #reset { margin-top: 20px; padding: 10px 28px; border: 0; border-radius: 999px; background: var(--accent); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; transition: filter .2s, transform .2s; }
+  #reset:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  a.back { margin-top: 20px; color: var(--muted); font-size: 13px; text-decoration: none; }
+  a.back:hover { color: var(--text); }
 </style>
 </head>
 <body>
+<img class="hero" src="othello-hero.png" alt="">
+<h1>OTHELLO</h1>
 <p id="status"></p>
 <div id="board"></div>
-<p><button id="reset">リセット</button></p>
+<button id="reset">リセット</button>
+<a class="back" href="index.html">← トップへ戻る</a>
 <script>
   const N = 8, dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
   let board, turn;
