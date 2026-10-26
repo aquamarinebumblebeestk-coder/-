@@ -4,6 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>トップ</title>
+<script>
+  // サーバに新しい版があれば読み込み直す
+  (async () => {
+    try {
+      const res = await fetch(location.pathname, { cache: 'no-cache' });
+      const latest = Date.parse(res.headers.get('last-modified'));
+      const key = 'reloaded:' + location.pathname;
+      if (latest > Date.parse(document.lastModified) && sessionStorage.getItem(key) != latest) {
+        sessionStorage.setItem(key, latest);
+        location.replace(location.pathname + '?v=' + Date.now() + location.hash);
+      }
+    } catch {}
+  })();
+</script>
 </head>
 <body>
 <ul>

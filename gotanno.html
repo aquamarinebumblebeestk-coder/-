@@ -4,6 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>五反野乗り換え案内</title>
+<script>
+  // サーバに新しい版があれば読み込み直す
+  (async () => {
+    try {
+      const res = await fetch(location.pathname, { cache: 'no-cache' });
+      const latest = Date.parse(res.headers.get('last-modified'));
+      const key = 'reloaded:' + location.pathname;
+      if (latest > Date.parse(document.lastModified) && sessionStorage.getItem(key) != latest) {
+        sessionStorage.setItem(key, latest);
+        location.replace(location.pathname + '?v=' + Date.now() + location.hash);
+      }
+    } catch {}
+  })();
+</script>
 <style>
   body { font-family: sans-serif; max-width: 480px; margin: 20px auto; padding: 0 16px; }
   select, button { font-size: 16px; padding: 4px; }
