@@ -18,8 +18,27 @@
     } catch {}
   })();
 </script>
+<style>
+  :root { --bg: #0b0d17; --card: rgba(255,255,255,.04); --line: rgba(255,255,255,.1); --text: #e8eaf2; --muted: #8b90a7; --accent: linear-gradient(135deg, #7c5cff, #00d4ff); }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: system-ui, -apple-system, "Hiragino Sans", sans-serif; color: var(--text);
+    background: radial-gradient(circle at 20% 0%, #2a1d6b 0, transparent 45%), radial-gradient(circle at 90% 100%, #00475e 0, transparent 40%), var(--bg);
+    display: flex; flex-direction: column; align-items: center; padding: 64px 16px; }
+  h1 { margin: 0 0 8px; font-size: clamp(32px, 7vw, 56px); letter-spacing: .04em; background: var(--accent); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { margin: 0 0 40px; color: var(--muted); letter-spacing: .2em; font-size: 12px; text-transform: uppercase; }
+  ul { list-style: none; padding: 0; margin: 0; width: 100%; max-width: 720px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  li a { display: block; padding: 28px 20px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); color: var(--text);
+    text-decoration: none; font-size: 18px; font-weight: 600; backdrop-filter: blur(8px); transition: transform .2s, border-color .2s, box-shadow .2s; }
+  li a::after { content: "→"; float: right; color: var(--muted); transition: transform .2s; }
+  li a:hover { transform: translateY(-4px); border-color: #7c5cff; box-shadow: 0 12px 32px rgba(124,92,255,.25); }
+  li a:hover::after { transform: translateX(4px); color: #00d4ff; }
+  #clear { margin-top: 48px; padding: 10px 20px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; transition: color .2s, border-color .2s; }
+  #clear:hover { color: var(--text); border-color: #00d4ff; }
+</style>
 </head>
 <body>
+<h1>Playground</h1>
+<p class="sub">Test apps</p>
 <ul>
   <li><a href="calculator.html">計算機</a></li>
   <li><a href="othello.html">オセロ</a></li>
