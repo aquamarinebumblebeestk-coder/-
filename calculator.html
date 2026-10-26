@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>計算機</title>
+<style>
+  body { font-family: sans-serif; display: flex; justify-content: center; margin-top: 40px; }
+  #calc { width: 240px; }
+  #display { width: 100%; box-sizing: border-box; font-size: 24px; text-align: right; padding: 8px; margin-bottom: 8px; }
+  #keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  button { font-size: 20px; padding: 12px 0; }
+</style>
+</head>
+<body>
+<div id="calc">
+  <input id="display" readonly value="0">
+  <div id="keys"></div>
+</div>
+<script>
+  const display = document.getElementById('display');
+  const keys = ['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+','C'];
+  let expr = '';
+  for (const k of keys) {
+    const b = document.createElement('button');
+    b.textContent = k;
+    b.onclick = () => {
+      if (k === 'C') expr = '';
+      else if (k === '=') {
+        try { expr = String(Function('return (' + expr + ')')()); } catch { expr = 'Error'; }
+      } else {
+        if (expr === 'Error') expr = '';
+        expr += k;
+      }
+      display.value = expr || '0';
+    };
+    document.getElementById('keys').appendChild(b);
+  }
+</script>
+</body>
+</html>
