@@ -16,10 +16,13 @@
 <p>
   <select id="mode"><option value="from">五反野発</option><option value="to">五反野着</option></select>
   <select id="station"></select>
+  <br>
+  <input type="time" id="time">
+  <select id="timeMode"><option value="dep">に出発</option><option value="arr">までに到着</option></select>
   <button id="go">検索</button>
 </p>
 <div id="result"></div>
-<p class="note">所要時間は1駅あたりの目安（スカイツリーライン・日比谷線2分、武蔵野線3分）と乗り換え時間から出した概算です。実際の時刻表とは違います。</p>
+<p class="note">所要時間は1駅あたりの目安（スカイツリーライン・日比谷線2分、武蔵野線3分）と乗り換え時間から出した概算です。実際の時刻表とは違い、列車の待ち時間は含みません。</p>
 <script>
   const lines = {
     sky: { name: '東武スカイツリーライン', min: 2, stations: ['浅草','とうきょうスカイツリー','曳舟','東向島','鐘ヶ淵','堀切','牛田','北千住','小菅','五反野','梅島','西新井','竹ノ塚','谷塚','草加','獨協大学前','新田','蒲生','新越谷','越谷','北越谷','大袋','せんげん台','武里','一ノ割','春日部','北春日部','姫宮','東武動物公園'] },
@@ -45,20 +48,38 @@
     sel.appendChild(g);
   }
 
+  const timeEl = document.getElementById('time');
+  timeEl.value = new Date().toTimeString().slice(0, 5);
+  const fmt = m => { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+
   document.getElementById('go').onclick = () => {
     const station = sel.value, toGotanno = document.getElementById('mode').value === 'to';
     let { legs, transfer } = legsTo(station);
     if (toGotanno) legs = legs.map(([l, a, b]) => [l, b, a]).reverse();
-    let total = 0, html = '<ol>';
+    // 乗車区間と乗り換えを所要分つきで並べる
+    const steps = [];
     legs.forEach(([l, a, b], i) => {
-      const st = lines[l].stations, n = Math.abs(st.indexOf(a) - st.indexOf(b)), t = n * lines[l].min;
-      total += t;
-      if (i > 0) { html += `<li>${transfer[0]}（約${transfer[1]}分）</li>`; total += transfer[1]; }
-      html += `<li>${lines[l].name}　${a} → ${b}（${n}駅・約${t}分）</li>`;
+      if (i > 0) steps.push({ transfer: transfer[0], t: transfer[1] });
+      const st = lines[l].stations, n = Math.abs(st.indexOf(a) - st.indexOf(b));
+      steps.push({ line: lines[l].name, a, b, n, t: n * lines[l].min });
     });
+    const total = steps.reduce((sum, x) => sum + x.t, 0);
+    const [h, m] = timeEl.value.split(':').map(Number);
+    let cur = h * 60 + m;
+    if (document.getElementById('timeMode').value === 'arr') cur -= total;
+    const startTime = cur;
+    let html = '<ol>';
+    for (const x of steps) {
+      const end = cur + x.t;
+      html += x.transfer
+        ? `<li>${fmt(cur)}〜${fmt(end)}　${x.transfer}（約${x.t}分）</li>`
+        : `<li>${fmt(cur)} ${x.a} 発 → ${fmt(end)} ${x.b} 着　${x.line}（${x.n}駅・約${x.t}分）</li>`;
+      cur = end;
+    }
     html += '</ol>';
     document.getElementById('result').innerHTML =
-      `<h2>${toGotanno ? station + ' → 五反野' : '五反野 → ' + station}</h2><p>所要時間 約${total}分</p>` + html;
+      `<h2>${toGotanno ? station + ' → 五反野' : '五反野 → ' + station}</h2>` +
+      `<p><b>${fmt(startTime)} 出発 → ${fmt(cur)} 到着</b>（約${total}分）</p>` + html;
   };
 </script>
 </body>
