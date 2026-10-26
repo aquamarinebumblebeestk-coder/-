@@ -11,5 +11,17 @@
   <li><a href="othello.html">オセロ</a></li>
   <li><a href="gotanno.html">五反野乗り換え案内</a></li>
 </ul>
+<p><button id="clear">キャッシュをクリア</button></p>
+<script>
+  document.getElementById('clear').onclick = async () => {
+    try { localStorage.clear(); sessionStorage.clear(); } catch {}
+    try { for (const k of await caches.keys()) await caches.delete(k); } catch {}
+    try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); } catch {}
+    // ブラウザのHTTPキャッシュはJSから消せないので、URLを変えて読み込み直す
+    location.href = location.pathname + '?v=' + Date.now();
+  };
+  // 各ページへのリンクも毎回新しく読み込むようにする
+  for (const a of document.querySelectorAll('ul a')) a.href += '?v=' + Date.now();
+</script>
 </body>
 </html>
