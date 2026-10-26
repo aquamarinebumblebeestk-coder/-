@@ -4,12 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>トップ</title>
-<style>
-  body { font-family: sans-serif; max-width: 480px; margin: 20px auto; padding: 0 16px; }
-  select, button { font-size: 16px; padding: 4px; }
-  ol { padding-left: 20px; }
-  .note { color: #666; font-size: 12px; }
-</style>
 </head>
 <body>
 <ul>
@@ -17,54 +11,5 @@
   <li><a href="othello.html">オセロ</a></li>
   <li><a href="gotanno.html">五反野乗り換え案内</a></li>
 </ul>
-<h1>五反野乗り換え案内</h1>
-<p>
-  <select id="mode"><option value="from">五反野発</option><option value="to">五反野着</option></select>
-  <select id="station"></select>
-  <button id="go">検索</button>
-</p>
-<div id="result"></div>
-<p class="note">所要時間は1駅あたりの目安（スカイツリーライン・日比谷線2分、武蔵野線3分）と乗り換え時間から出した概算です。実際の時刻表とは違います。</p>
-<script>
-  const lines = {
-    sky: { name: '東武スカイツリーライン', min: 2, stations: ['浅草','とうきょうスカイツリー','曳舟','東向島','鐘ヶ淵','堀切','牛田','北千住','小菅','五反野','梅島','西新井','竹ノ塚','谷塚','草加','獨協大学前','新田','蒲生','新越谷','越谷','北越谷','大袋','せんげん台','武里','一ノ割','春日部','北春日部','姫宮','東武動物公園'] },
-    hibiya: { name: '東京メトロ日比谷線', min: 2, stations: ['北千住','南千住','三ノ輪','入谷','上野','仲御徒町','秋葉原','小伝馬町','人形町','茅場町','八丁堀','築地','東銀座','銀座','日比谷','霞ケ関','虎ノ門ヒルズ','神谷町','六本木','広尾','恵比寿','中目黒'] },
-    musashino: { name: 'JR武蔵野線', min: 3, stations: ['府中本町','北府中','西国分寺','新小平','新秋津','東所沢','新座','北朝霞','西浦和','武蔵浦和','南浦和','東浦和','東川口','南越谷','越谷レイクタウン','吉川','吉川美南','新三郷','三郷','南流山','新松戸','新八柱','東松戸','市川大野','船橋法典','西船橋'] },
-  };
-
-  // 五反野から見た行き方: [路線, 乗車駅, 降車駅] の並び。乗り換え時間つき
-  function legsTo(dest) {
-    if (lines.sky.stations.includes(dest)) return { legs: [['sky', '五反野', dest]], transfer: [] };
-    if (lines.hibiya.stations.includes(dest)) return { legs: [['sky', '五反野', '北千住'], ['hibiya', '北千住', dest]], transfer: ['北千住で乗り換え（日比谷線直通の列車なら乗り換えなし）', 5] };
-    return { legs: [['sky', '五反野', '新越谷'], ['musashino', '南越谷', dest]], transfer: ['新越谷駅と南越谷駅の間を徒歩で乗り換え', 7] };
-  }
-
-  const sel = document.getElementById('station');
-  for (const k in lines) {
-    const g = document.createElement('optgroup');
-    g.label = lines[k].name;
-    for (const s of lines[k].stations) {
-      if (s === '五反野' || (k !== 'sky' && lines.sky.stations.includes(s))) continue;
-      g.appendChild(new Option(s, s));
-    }
-    sel.appendChild(g);
-  }
-
-  document.getElementById('go').onclick = () => {
-    const station = sel.value, toGotanno = document.getElementById('mode').value === 'to';
-    let { legs, transfer } = legsTo(station);
-    if (toGotanno) legs = legs.map(([l, a, b]) => [l, b, a]).reverse();
-    let total = 0, html = '<ol>';
-    legs.forEach(([l, a, b], i) => {
-      const st = lines[l].stations, n = Math.abs(st.indexOf(a) - st.indexOf(b)), t = n * lines[l].min;
-      total += t;
-      if (i > 0) { html += `<li>${transfer[0]}（約${transfer[1]}分）</li>`; total += transfer[1]; }
-      html += `<li>${lines[l].name}　${a} → ${b}（${n}駅・約${t}分）</li>`;
-    });
-    html += '</ol>';
-    document.getElementById('result').innerHTML =
-      `<h2>${toGotanno ? station + ' → 五反野' : '五反野 → ' + station}</h2><p>所要時間 約${total}分</p>` + html;
-  };
-</script>
 </body>
 </html>
