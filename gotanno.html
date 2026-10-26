@@ -19,24 +19,60 @@
   })();
 </script>
 <style>
-  body { font-family: sans-serif; max-width: 480px; margin: 20px auto; padding: 0 16px; }
-  select, button { font-size: 16px; padding: 4px; }
-  ol { padding-left: 20px; }
-  .note { color: #666; font-size: 12px; }
+  :root { --bg: #0b0d17; --card: rgba(255,255,255,.04); --line: rgba(255,255,255,.1); --text: #e8eaf2; --muted: #8b90a7; --accent: linear-gradient(135deg, #7c5cff, #00d4ff); }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: system-ui, -apple-system, "Hiragino Sans", sans-serif; color: var(--text);
+    background: radial-gradient(circle at 20% 0%, #2a1d6b 0, transparent 45%), radial-gradient(circle at 90% 100%, #00475e 0, transparent 40%), var(--bg);
+    padding: 48px 16px; }
+  main { max-width: 560px; margin: 0 auto; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 28px; }
+  h1 { margin: 0; font-size: clamp(24px, 6vw, 34px); background: var(--accent); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  header svg { width: 110px; flex-shrink: 0; opacity: .55; }
+  .card { padding: 20px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); backdrop-filter: blur(8px); }
+  .form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  select, input, button { width: 100%; min-width: 0; font: inherit; font-size: 15px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--text); color-scheme: dark; }
+  select:focus, input:focus { outline: none; border-color: #7c5cff; }
+  #go { grid-column: 1 / -1; border: 0; background: var(--accent); font-weight: 700; cursor: pointer; transition: filter .2s, transform .2s; }
+  #go:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  #result:not(:empty) { margin-top: 20px; }
+  #result h2 { margin: 0 0 6px; font-size: 18px; }
+  #result p { margin: 0 0 12px; color: #00d4ff; }
+  ol { list-style: none; margin: 0; padding: 0 0 0 18px; border-left: 2px solid #7c5cff; }
+  ol li { position: relative; padding: 6px 0; font-size: 14px; }
+  ol li::before { content: ""; position: absolute; left: -24px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: #00d4ff; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 20px; }
+  a.back { display: inline-block; margin-top: 20px; color: var(--muted); font-size: 13px; text-decoration: none; }
+  a.back:hover { color: var(--text); }
 </style>
 </head>
 <body>
-<h1>五反野乗り換え案内</h1>
-<p>
-  <select id="mode"><option value="from">五反野発</option><option value="to">五反野着</option></select>
-  <select id="station"></select>
-  <br>
-  <input type="time" id="time">
-  <select id="timeMode"><option value="dep">に出発</option><option value="arr">までに到着</option></select>
-  <button id="go">検索</button>
-</p>
-<div id="result"></div>
+<main>
+<header>
+  <h1>五反野乗り換え案内</h1>
+  <svg viewBox="0 0 120 50" aria-hidden="true">
+    <rect x="4" y="6" width="104" height="30" rx="10" fill="none" stroke="#00d4ff" stroke-width="2.5"/>
+    <rect x="14" y="13" width="14" height="10" rx="2" fill="#00d4ff"/>
+    <rect x="34" y="13" width="14" height="10" rx="2" fill="#00d4ff"/>
+    <rect x="54" y="13" width="14" height="10" rx="2" fill="#00d4ff"/>
+    <rect x="74" y="13" width="14" height="10" rx="2" fill="#00d4ff"/>
+    <path d="M94 13h8a4 4 0 0 1 4 4v6H94z" fill="#7c5cff"/>
+    <circle cx="26" cy="40" r="4" fill="#7c5cff"/><circle cx="86" cy="40" r="4" fill="#7c5cff"/>
+    <line x1="0" y1="47" x2="120" y2="47" stroke="#8b90a7" stroke-width="2"/>
+  </svg>
+</header>
+<div class="card">
+  <div class="form">
+    <select id="mode"><option value="from">五反野発</option><option value="to">五反野着</option></select>
+    <select id="station"></select>
+    <input type="time" id="time">
+    <select id="timeMode"><option value="dep">に出発</option><option value="arr">までに到着</option></select>
+    <button id="go">検索</button>
+  </div>
+  <div id="result"></div>
+</div>
 <p class="note">所要時間は1駅あたりの目安（スカイツリーライン・日比谷線2分、武蔵野線3分）と乗り換え時間から出した概算です。実際の時刻表とは違い、列車の待ち時間は含みません。</p>
+<a class="back" href="index.html">← トップへ戻る</a>
+</main>
 <script>
   const lines = {
     sky: { name: '東武スカイツリーライン', min: 2, stations: ['浅草','とうきょうスカイツリー','曳舟','東向島','鐘ヶ淵','堀切','牛田','北千住','小菅','五反野','梅島','西新井','竹ノ塚','谷塚','草加','獨協大学前','新田','蒲生','新越谷','越谷','北越谷','大袋','せんげん台','武里','一ノ割','春日部','北春日部','姫宮','東武動物公園'] },
