@@ -83,5 +83,20 @@
   document.getElementById('reset').onclick = reset;
   reset();
 </script>
+<script>
+  // サーバに新しい版があれば読み込み直す（連続リロード防止に10秒あける）
+  (async () => {
+    try {
+      const last = Number(sessionStorage.getItem('reloaded:' + location.pathname) || 0);
+      if (Date.now() - last < 10000) return;
+      const get = cache => fetch(location.href, { cache }).then(r => r.ok ? r.text() : null);
+      const [latest, current] = await Promise.all([get('no-store'), get('force-cache')]);
+      if (latest && current && latest !== current) {
+        sessionStorage.setItem('reloaded:' + location.pathname, Date.now());
+        location.replace(location.pathname + '?v=' + Date.now());
+      }
+    } catch {}
+  })();
+</script>
 </body>
 </html>
