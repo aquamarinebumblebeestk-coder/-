@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>オセロ</title>
+<style>
+  body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
+  #board { display: grid; grid-template-columns: repeat(8, 40px); gap: 2px; background: #333; padding: 2px; }
+  .cell { width: 40px; height: 40px; background: #2e8b57; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .cell.hint::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: rgba(0,0,0,.3); }
+  .disc { width: 32px; height: 32px; border-radius: 50%; }
+  .b { background: #000; }
+  .w { background: #fff; }
+</style>
+</head>
+<body>
+<p id="status"></p>
+<div id="board"></div>
+<p><button id="reset">リセット</button></p>
+<script>
+  const N = 8, dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+  let board, turn;
+
+  function reset() {
+    board = Array.from({ length: N }, () => Array(N).fill(null));
+    board[3][3] = board[4][4] = 'w';
+    board[3][4] = board[4][3] = 'b';
+    turn = 'b';
+    render();
+  }
+
+  function flips(r, c, p) {
+    if (board[r][c]) return [];
+    const o = p === 'b' ? 'w' : 'b', res = [];
+    for (const [dr, dc] of dirs) {
+      const line = [];
+      let y = r + dr, x = c + dc;
+      while (y >= 0 && y < N && x >= 0 && x < N && board[y][x] === o) { line.push([y, x]); y += dr; x += dc; }
+      if (line.length && y >= 0 && y < N && x >= 0 && x < N && board[y][x] === p) res.push(...line);
+    }
+    return res;
+  }
+
+  function hasMove(p) {
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (flips(r, c, p).length) return true;
+    return false;
+  }
+
+  function play(r, c) {
+    const f = flips(r, c, turn);
+    if (!f.length) return;
+    board[r][c] = turn;
+    for (const [y, x] of f) board[y][x] = turn;
+    const o = turn === 'b' ? 'w' : 'b';
+    if (hasMove(o)) turn = o;
+    render();
+  }
+
+  function render() {
+    const el = document.getElementById('board');
+    el.innerHTML = '';
+    let b = 0, w = 0;
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const v = board[r][c];
+      if (v) {
+        const d = document.createElement('div');
+        d.className = 'disc ' + v;
+        cell.appendChild(d);
+        v === 'b' ? b++ : w++;
+      } else if (flips(r, c, turn).length) cell.classList.add('hint');
+      cell.onclick = () => play(r, c);
+      el.appendChild(cell);
+    }
+    const name = turn === 'b' ? '黒' : '白';
+    document.getElementById('status').textContent = hasMove(turn)
+      ? `${name}の番　黒 ${b} : 白 ${w}`
+      : `終了　黒 ${b} : 白 ${w}　${b > w ? '黒の勝ち' : w > b ? '白の勝ち' : '引き分け'}`;
+  }
+
+  document.getElementById('reset').onclick = reset;
+  reset();
+</script>
+</body>
+</html>
