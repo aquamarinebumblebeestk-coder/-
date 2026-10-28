@@ -89,7 +89,7 @@ const sigmoid = x => 1 / (1 + Math.exp(-x));
 
 // ミニバッチSGD。出現の少ない特徴は勾配も小さいので、少ないデータでぶれにくい。
 // さらに駒の価値だけの初期重み w0 に引き戻す L2 正則化をかけて過学習を防ぐ
-function train(w, data, { epochs = 4, lr = 3000, reg = 1e-6, log = console.log } = {}) {
+function train(w, data, { epochs = 4, lr = 20000, reg = 1e-7, log = console.log } = {}) {
   const w0 = E.materialWeights(), g = new Float64Array(E.NW);
   const valid = data.filter((_, i) => i % 20 === 0), tr = data.filter((_, i) => i % 20 !== 0);
   const loss = set => {
