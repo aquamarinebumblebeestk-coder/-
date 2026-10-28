@@ -67,7 +67,7 @@ function computeHash() {
 function setPosition(pos) {
   for (let i = 0; i < 81; i++) { board[i] = pos.board[i]; if (board[i] === 8) king[0] = i; if (board[i] === -8) king[1] = i; }
   for (let s = 0; s < 2; s++) for (let t = 0; t < 8; t++) hand[s * 8 + t] = pos.hand[s][t] || 0;
-  side = pos.side;
+  side = pos.side; sp = 0;
   computeHash();
 }
 function getPosition() {
@@ -162,7 +162,7 @@ function genMoves(capOnly) {
   return out;
 }
 
-const undoCap = new Int8Array(1024), undoLo = new Int32Array(1024), undoHi = new Int32Array(1024);
+const undoCap = new Int8Array(2048), undoLo = new Int32Array(2048), undoHi = new Int32Array(2048);
 let sp = 0;
 function xorHand(i) { hashLo ^= ZHLO[i * 20 + hand[i]]; hashHi ^= ZHHI[i * 20 + hand[i]]; }
 function xorPiece(p, sq) { hashLo ^= ZLO[zp(p, sq)]; hashHi ^= ZHI[zp(p, sq)]; }
