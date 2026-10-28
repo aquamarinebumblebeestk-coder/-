@@ -19,7 +19,8 @@ if (!isMainThread) {
   const { task, n, w, w2, nodes } = workerData;
   if (task === 'selfplay') parentPort.postMessage(selfplay(n, E.decodeWeights(w), nodes));
   else parentPort.postMessage(match(n, E.decodeWeights(w), E.decodeWeights(w2), nodes));
-} else main();
+} else if (require.main === module) main();
+module.exports = { train };
 
 // 序盤は乱数を混ぜて毎局違う将棋にする
 function opening(plies) {
@@ -86,9 +87,10 @@ function runWorkers(task, total, extra) {
 
 const sigmoid = x => 1 / (1 + Math.exp(-x));
 
-function train(w, data, epochs) {
-  const m = new Float64Array(E.NW), v = new Float64Array(E.NW), g = new Float64Array(E.NW);
-  const touched = new Uint8Array(E.NW);
+// ミニバッチSGD。出現の少ない特徴は勾配も小さいので、少ないデータでぶれにくい。
+// さらに駒の価値だけの初期重み w0 に引き戻す L2 正則化をかけて過学習を防ぐ
+function train(w, data, { epochs = 4, lr = 3000, reg = 1e-6, log = console.log } = {}) {
+  const w0 = E.materialWeights(), g = new Float64Array(E.NW);
   const valid = data.filter((_, i) => i % 20 === 0), tr = data.filter((_, i) => i % 20 !== 0);
   const loss = set => {
     let L = 0;
@@ -100,14 +102,13 @@ function train(w, data, epochs) {
     }
     return L / set.length;
   };
-  console.log(`  学習データ ${tr.length} 局面、検証 ${valid.length} 局面。学習前の検証損失 ${loss(valid).toFixed(4)}`);
-  const B = 512, b1 = 0.9, b2 = 0.999;
-  let step = 0;
+  log(`  学習データ ${tr.length} 局面、検証 ${valid.length} 局面。学習前の検証損失 ${loss(valid).toFixed(4)}`);
+  const B = 256;
   for (let ep = 0; ep < epochs; ep++) {
     for (let i = tr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tr[i], tr[j]] = [tr[j], tr[i]]; }
-    const lr = 2 * (1 - ep / epochs) + 0.2;
+    const rate = lr * (1 - 0.7 * ep / epochs);
     for (let s = 0; s < tr.length; s += B) {
-      g.fill(0); touched.fill(0);
+      g.fill(0);
       const end = Math.min(s + B, tr.length);
       for (let k = s; k < end; k++) {
         const p = tr[k];
@@ -115,17 +116,12 @@ function train(w, data, epochs) {
         for (let i = 0; i < p.idx.length; i++) e += p.sgn[i] * w[p.idx[i]];
         const t = LAMBDA * sigmoid(p.score / K) + (1 - LAMBDA) * p.result;
         const d = (sigmoid(e / K) - t) / K;
-        for (let i = 0; i < p.idx.length; i++) { g[p.idx[i]] += p.sgn[i] * d; touched[p.idx[i]] = 1; }
+        for (let i = 0; i < p.idx.length; i++) g[p.idx[i]] += p.sgn[i] * d;
       }
-      step++;
-      for (let i = 0; i < E.NW; i++) {
-        if (!touched[i]) continue;
-        const gi = g[i] / (end - s) * 1e4;
-        m[i] = b1 * m[i] + (1 - b1) * gi; v[i] = b2 * v[i] + (1 - b2) * gi * gi;
-        w[i] -= lr * (m[i] / (1 - b1 ** step)) / (Math.sqrt(v[i] / (1 - b2 ** step)) + 1e-8);
-      }
+      const n = end - s;
+      for (let i = 0; i < E.NW; i++) w[i] -= rate * (g[i] / n + reg * (w[i] - w0[i]));
     }
-    console.log(`  エポック ${ep + 1}: 検証損失 ${loss(valid).toFixed(4)}`);
+    log(`  エポック ${ep + 1}: 検証損失 ${loss(valid).toFixed(4)}`);
   }
 }
 
@@ -145,7 +141,7 @@ async function main() {
     pool = pool.slice(-400000).concat(data);   // 直近のデータを残して使う
     const prev = Float32Array.from(w);
     t = Date.now();
-    train(w, pool, 4);
+    train(w, pool);
     console.log(`  学習 ${((Date.now() - t) / 1000) | 0} 秒`);
     const res = (await runWorkers('match', 100, { w: E.encodeWeights(w), w2: E.encodeWeights(prev), nodes: PLAY_NODES }))
       .reduce((s, x) => ({ a: s.a + x.a, b: s.b + x.b, d: s.d + x.d }), { a: 0, b: 0, d: 0 });
