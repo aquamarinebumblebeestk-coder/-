@@ -147,6 +147,8 @@ async function main() {
       .reduce((s, x) => ({ a: s.a + x.a, b: s.b + x.b, d: s.d + x.d }), { a: 0, b: 0, d: 0 });
     const rate = (res.a + res.d / 2) / (res.a + res.b + res.d);
     console.log(`  新 vs 前: ${res.a}勝 ${res.b}敗 ${res.d}分（勝率 ${(rate * 100).toFixed(1)}%、Elo差 ${elo(rate)}）`);
+    // 負け越したら前の重みに戻す（集めたデータは次のラウンドでも使う）
+    if (rate < 0.5) { w = prev; console.log('  負け越したので前の重みに戻します'); }
     fs.writeFileSync(WEIGHTS, E.encodeWeights(w));
   }
   const res = (await runWorkers('match', 100, { w: E.encodeWeights(w), w2: E.encodeWeights(start), nodes: PLAY_NODES }))
