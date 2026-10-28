@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>将棋</title>
+<script>
+  // サーバに新しい版があれば読み込み直す
+  (async () => {
+    try {
+      const res = await fetch(location.pathname, { cache: 'no-cache' });
+      const latest = Date.parse(res.headers.get('last-modified'));
+      const key = 'reloaded:' + location.pathname;
+      if (latest > Date.parse(document.lastModified) && sessionStorage.getItem(key) != latest) {
+        sessionStorage.setItem(key, latest);
+        location.replace(location.pathname + '?v=' + Date.now() + location.hash);
+      }
+    } catch {}
+  })();
+</script>
+<style>
+  :root { --bg: #0b0d17; --card: rgba(255,255,255,.04); --line: rgba(255,255,255,.1); --text: #e8eaf2; --muted: #8b90a7; --accent: linear-gradient(135deg, #7c5cff, #00d4ff); }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: system-ui, -apple-system, "Hiragino Sans", sans-serif; color: var(--text);
+    background: radial-gradient(circle at 20% 0%, #2a1d6b 0, transparent 45%), radial-gradient(circle at 90% 100%, #00475e 0, transparent 40%), var(--bg);
+    display: flex; flex-direction: column; align-items: center; padding: 32px 16px; }
+  h1 { margin: 0 0 16px; font-size: clamp(28px, 7vw, 40px); letter-spacing: .08em; background: var(--accent); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #status { margin: 0 0 12px; padding: 8px 18px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 14px; text-align: center; }
+  .wrap { --s: min(42px, calc((100vw - 52px) / 9)); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .hand { min-height: calc(var(--s) + 10px); width: calc(var(--s) * 9 + 32px); display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 4px 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
+  .hand .label { color: var(--muted); font-size: 12px; margin-right: 4px; }
+  .hand .hp { position: relative; width: var(--s); height: var(--s); display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; }
+  .hand .hp.sel { background: rgba(0,212,255,.25); box-shadow: 0 0 10px rgba(0,212,255,.5); }
+  .hand .hp b { position: absolute; right: -2px; bottom: -2px; font-size: 11px; background: #7c5cff; color: #fff; border-radius: 999px; padding: 0 5px; }
+  #board { display: grid; grid-template-columns: repeat(9, var(--s)); gap: 2px; padding: 8px; border-radius: 16px;
+    background: rgba(0,212,255,.25); box-shadow: 0 0 40px rgba(0,212,255,.25), 0 20px 50px rgba(0,0,0,.5); }
+  .cell { width: var(--s); height: var(--s); background: linear-gradient(135deg, #3a2f1c, #261e10); display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; }
+  .cell:first-child { border-top-left-radius: 10px; } .cell:nth-child(9) { border-top-right-radius: 10px; }
+  .cell:nth-child(73) { border-bottom-left-radius: 10px; } .cell:last-child { border-bottom-right-radius: 10px; }
+  .cell.last { background: linear-gradient(135deg, #5a4520, #3d2e14); }
+  .cell.sel { background: linear-gradient(135deg, #1d5c66, #12393f); }
+  .cell.hint::after { content: ''; position: absolute; width: 26%; height: 26%; border-radius: 50%; background: rgba(0,212,255,.55); box-shadow: 0 0 8px #00d4ff; pointer-events: none; }
+  .pc { width: 86%; height: 92%; display: flex; align-items: center; justify-content: center; padding-top: 8%;
+    clip-path: polygon(50% 0, 88% 18%, 100% 100%, 0 100%, 12% 18%); background: linear-gradient(160deg, #f6e7c1, #d9b878);
+    color: #1b1408; font-weight: 700; font-size: calc(var(--s) * .5); font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; line-height: 1; }
+  .pc.g { transform: rotate(180deg); }
+  .pc.p { color: #c41a1a; }
+  .pc.k { font-size: calc(var(--s) * .52); }
+  .ctrl { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
+  .btn { padding: 10px 24px; border: 0; border-radius: 999px; background: var(--accent); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; transition: filter .2s, transform .2s; }
+  .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); font-weight: 400; }
+  .btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  select { padding: 10px 14px; border-radius: 999px; border: 1px solid var(--line); background: #151827; color: var(--text); font: inherit; }
+  #promo { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.55); }
+  #promo.show { display: flex; }
+  #promo div { padding: 24px; border-radius: 16px; background: #151827; border: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; align-items: center; }
+  #promo p { margin: 0; }
+  a.back { margin-top: 20px; color: var(--muted); font-size: 13px; text-decoration: none; }
+  a.back:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<h1>SHOGI</h1>
+<p id="status"></p>
+<div class="wrap">
+  <div class="hand" id="hand1"></div>
+  <div id="board"></div>
+  <div class="hand" id="hand0"></div>
+</div>
+<div class="ctrl">
+  <select id="mode"><option value="cpu">CPU（後手）と対局</option><option value="pvp">二人で対局</option></select>
+  <button class="btn ghost" id="undo">待った</button>
+  <button class="btn" id="reset">最初から</button>
+</div>
+<a class="back" href="index.html">← トップへ戻る</a>
+<div id="promo"><div><p>成りますか？</p><div style="flex-direction:row;padding:0;border:0"><button class="btn" id="yes">成る</button><button class="btn ghost" id="no">成らない</button></div></div></div>
+<script>
+  // 盤は81マスの配列。0が左上（9一）、先手(0)は上へ、後手(1)は下へ進む
+  const NAME = { K: '玉', R: '飛', B: '角', G: '金', S: '銀', N: '桂', L: '香', P: '歩' };
+  const PRO = { R: '龍', B: '馬', S: '全', N: '圭', L: '杏', P: 'と' };
+  const VAL = { P: 1, L: 3, N: 4, S: 5, G: 6, B: 8, R: 10, K: 1000 };
+  const PVAL = { P: 6, L: 6, N: 6, S: 6, B: 11, R: 13 };
+  const HAND_ORDER = ['R', 'B', 'G', 'S', 'N', 'L', 'P'];
+  const KANJI = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  const ORTH = [[-1, 0], [1, 0], [0, -1], [0, 1]], DIAG = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+  const GOLD = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, 0]];
+  const STEP = { K: [...ORTH, ...DIAG], G: GOLD, S: [[-1, -1], [-1, 0], [-1, 1], [1, -1], [1, 1]], N: [[-2, -1], [-2, 1]], P: [[-1, 0]] };
+
+  let S, history, sel, lastTo, lastText, mode = 'cpu', pending;
+
+  function initial() {
+    const b = Array(81).fill(null);
+    const back = ['L', 'N', 'S', 'G', 'K', 'G', 'S', 'N', 'L'];
+    back.forEach((t, c) => { b[c] = { t, o: 1, p: false }; b[72 + c] = { t, o: 0, p: false }; });
+    for (let c = 0; c < 9; c++) { b[18 + c] = { t: 'P', o: 1, p: false }; b[54 + c] = { t: 'P', o: 0, p: false }; }
+    b[10] = { t: 'R', o: 1, p: false }; b[16] = { t: 'B', o: 1, p: false };
+    b[64] = { t: 'B', o: 0, p: false }; b[70] = { t: 'R', o: 0, p: false };
+    const h = () => ({ R: 0, B: 0, G: 0, S: 0, N: 0, L: 0, P: 0 });
+    return { b, h: [h(), h()], turn: 0 };
+  }
+
+  // 駒の動き：s=1マスだけ動ける方向、l=どこまでも動ける方向（先手から見た向き）
+  function moves(pc) {
+    if (pc.p) {
+      if (pc.t === 'R') return { s: DIAG, l: ORTH };
+      if (pc.t === 'B') return { s: ORTH, l: DIAG };
+      return { s: GOLD, l: [] };
+    }
+    if (pc.t === 'R') return { s: [], l: ORTH };
+    if (pc.t === 'B') return { s: [], l: DIAG };
+    if (pc.t === 'L') return { s: [], l: [[-1, 0]] };
+    return { s: STEP[pc.t], l: [] };
+  }
+
+  // 敵陣：先手なら上3段、後手なら下3段。row はその駒から見た奥からの段数
+  const rank = (r, o) => o === 0 ? r : 8 - r;
+  const canPromote = pc => !pc.p && pc.t !== 'K' && pc.t !== 'G';
+  const mustPromote = (t, r, o) => ((t === 'P' || t === 'L') && rank(r, o) === 0) || (t === 'N' && rank(r, o) <= 1);
+
+  function targets(S, i) {
+    const pc = S.b[i], r = Math.floor(i / 9), c = i % 9, f = pc.o === 0 ? 1 : -1, out = [];
+    const { s, l } = moves(pc);
+    for (const [dr, dc] of s) {
+      const y = r + dr * f, x = c + dc;
+      if (y < 0 || y > 8 || x < 0 || x > 8) continue;
+      const t = S.b[y * 9 + x];
+      if (!t || t.o !== pc.o) out.push(y * 9 + x);
+    }
+    for (const [dr, dc] of l) {
+      let y = r + dr * f, x = c + dc;
+      while (y >= 0 && y <= 8 && x >= 0 && x <= 8) {
+        const t = S.b[y * 9 + x];
+        if (t && t.o === pc.o) break;
+        out.push(y * 9 + x);
+        if (t) break;
+        y += dr * f; x += dc;
+      }
+    }
+    return out;
+  }
+
+  function attacked(S, sq, by) {
+    for (let i = 0; i < 81; i++) if (S.b[i] && S.b[i].o === by && targets(S, i).includes(sq)) return true;
+    return false;
+  }
+
+  function inCheck(S, side) {
+    const k = S.b.findIndex(p => p && p.o === side && p.t === 'K');
+    return k >= 0 && attacked(S, k, 1 - side);
+  }
+
+  function next(S, m) {
+    const b = S.b.slice(), h = [{ ...S.h[0] }, { ...S.h[1] }], o = S.turn;
+    if (m.drop) {
+      b[m.to] = { t: m.drop, o, p: false };
+      h[o][m.drop]--;
+    } else {
+      const pc = b[m.from], cap = b[m.to];
+      if (cap) h[o][cap.t]++;
+      b[m.from] = null;
+      b[m.to] = m.promo ? { t: pc.t, o, p: true } : pc;
+    }
+    return { b, h, turn: 1 - o };
+  }
+
+  function pseudoBoardMoves(S) {
+    const out = [];
+    for (let i = 0; i < 81; i++) {
+      const pc = S.b[i];
+      if (!pc || pc.o !== S.turn) continue;
+      for (const to of targets(S, i)) {
+        const tr = Math.floor(to / 9), fr = Math.floor(i / 9);
+        const zone = canPromote(pc) && (rank(tr, pc.o) <= 2 || rank(fr, pc.o) <= 2);
+        if (zone) out.push({ from: i, to, promo: true });
+        if (!zone || !mustPromote(pc.t, tr, pc.o)) out.push({ from: i, to, promo: false });
+      }
+    }
+    return out;
+  }
+
+  function dropMoves(S, checkMateByPawn = true) {
+    const o = S.turn, out = [];
+    for (const t of HAND_ORDER) {
+      if (!S.h[o][t]) continue;
+      for (let i = 0; i < 81; i++) {
+        if (S.b[i]) continue;
+        const r = Math.floor(i / 9), c = i % 9;
+        if (mustPromote(t, r, o)) continue;
+        if (t === 'P') {
+          // 二歩
+          let nifu = false;
+          for (let y = 0; y < 9; y++) { const p = S.b[y * 9 + c]; if (p && p.o === o && p.t === 'P' && !p.p) nifu = true; }
+          if (nifu) continue;
+          // 打ち歩詰め
+          if (checkMateByPawn) {
+            const n = next(S, { drop: 'P', to: i });
+            if (inCheck(n, 1 - o) && !hasLegal(n)) continue;
+          }
+        }
+        out.push({ drop: t, to: i });
+      }
+    }
+    return out;
+  }
+
+  const legal = m => !inCheck(next(S, m), S.turn);
+  function legalMoves(S) {
+    return [...pseudoBoardMoves(S), ...dropMoves(S)].filter(m => !inCheck(next(S, m), S.turn));
+  }
+  function hasLegal(S) {
+    for (const m of pseudoBoardMoves(S)) if (!inCheck(next(S, m), S.turn)) return true;
+    for (const m of dropMoves(S, false)) if (!inCheck(next(S, m), S.turn)) return true;
+    return false;
+  }
+
+  function moveText(S, m) {
+    const o = S.turn, r = Math.floor(m.to / 9), c = m.to % 9;
+    const sq = m.to === lastTo ? '同' : (9 - c) + KANJI[r];
+    if (m.drop) return (o ? '☖' : '☗') + sq + NAME[m.drop] + '打';
+    const pc = S.b[m.from];
+    const zone = canPromote(pc) && (rank(r, o) <= 2 || rank(Math.floor(m.from / 9), o) <= 2);
+    return (o ? '☖' : '☗') + sq + (pc.p ? PRO[pc.t] : NAME[pc.t]) + (m.promo ? '成' : zone ? '不成' : '');
+  }
+
+  function play(m) {
+    history.push({ S, lastTo, lastText });
+    lastText = moveText(S, m);
+    S = next(S, m);
+    lastTo = m.to;
+    sel = null;
+    render();
+    if (mode === 'cpu' && S.turn === 1 && hasLegal(S)) setTimeout(cpu, 300);
+  }
+
+  // CPU：駒の損得で2手先まで読む
+  function evaluate(S, side) {
+    let v = 0;
+    for (const p of S.b) if (p) v += (p.o === side ? 1 : -1) * (p.p ? PVAL[p.t] : VAL[p.t]);
+    for (const t of HAND_ORDER) v += (S.h[side][t] - S.h[1 - side][t]) * VAL[t] * 1.1;
+    return v;
+  }
+  function cpu() {
+    if (mode !== 'cpu' || S.turn !== 1) return;
+    const me = S.turn;
+    let best = null, bestV = -Infinity;
+    for (const m of legalMoves(S)) {
+      const n = next(S, m);
+      let v;
+      if (!hasLegal(n)) v = 1e6;
+      else {
+        let worst = Infinity;
+        for (const r of pseudoBoardMoves(n)) worst = Math.min(worst, evaluate(next(n, r), me));
+        v = worst + (inCheck(n, 1 - me) ? 0.3 : 0) + Math.random() * 0.5;
+      }
+      if (v > bestV) { bestV = v; best = m; }
+    }
+    if (best) play(best);
+  }
+
+  function clickCell(i) {
+    if (mode === 'cpu' && S.turn === 1) return;
+    if (!hasLegal(S)) return;
+    const pc = S.b[i];
+    if (sel != null) {
+      const ms = selMoves().filter(m => m.to === i);
+      if (ms.length === 1) return play(ms[0]);
+      if (ms.length === 2) {
+        pending = ms;
+        document.getElementById('promo').classList.add('show');
+        return;
+      }
+    }
+    sel = pc && pc.o === S.turn && sel !== i ? i : null;
+    render();
+  }
+
+  function clickHand(o, t) {
+    if (o !== S.turn || (mode === 'cpu' && S.turn === 1)) return;
+    sel = sel === t ? null : t;
+    render();
+  }
+
+  function selMoves() {
+    if (sel == null) return [];
+    if (typeof sel === 'string') return dropMoves(S).filter(m => m.drop === sel && legal(m));
+    return pseudoBoardMoves(S).filter(m => m.from === sel && legal(m));
+  }
+
+  function pieceEl(pc) {
+    const d = document.createElement('div');
+    d.className = 'pc' + (pc.o ? ' g' : '') + (pc.p ? ' p' : '') + (pc.t === 'K' ? ' k' : '');
+    d.textContent = pc.p ? PRO[pc.t] : pc.t === 'K' ? (pc.o ? '王' : '玉') : NAME[pc.t];
+    return d;
+  }
+
+  function render() {
+    const hints = new Set(selMoves().map(m => m.to));
+    const el = document.getElementById('board');
+    el.innerHTML = '';
+    for (let i = 0; i < 81; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (i === sel ? ' sel' : '') + (i === lastTo ? ' last' : '') + (hints.has(i) ? ' hint' : '');
+      if (S.b[i]) cell.appendChild(pieceEl(S.b[i]));
+      cell.onclick = () => clickCell(i);
+      el.appendChild(cell);
+    }
+    for (const o of [0, 1]) {
+      const h = document.getElementById('hand' + o);
+      h.innerHTML = `<span class="label">${o ? '☖後手' : '☗先手'}</span>`;
+      for (const t of HAND_ORDER) {
+        if (!S.h[o][t]) continue;
+        const d = document.createElement('div');
+        d.className = 'hp' + (S.turn === o && sel === t ? ' sel' : '');
+        d.appendChild(pieceEl({ t, o, p: false }));
+        if (S.h[o][t] > 1) d.insertAdjacentHTML('beforeend', `<b>${S.h[o][t]}</b>`);
+        d.onclick = () => clickHand(o, t);
+        h.appendChild(d);
+      }
+    }
+    const side = S.turn ? '☖後手' : '☗先手';
+    const prev = lastText ? lastText + '　' : '';
+    let msg;
+    if (!hasLegal(S)) msg = `${prev}まで、${S.turn ? '☗先手' : '☖後手'}の勝ち`;
+    else msg = `${prev}${side}の番${inCheck(S, S.turn) ? '（王手）' : ''}`;
+    document.getElementById('status').textContent = msg;
+  }
+
+  function choosePromo(p) {
+    document.getElementById('promo').classList.remove('show');
+    const m = pending.find(m => m.promo === p);
+    pending = null;
+    play(m);
+  }
+
+  function reset() {
+    S = initial(); history = []; sel = null; lastTo = null; lastText = '';
+    render();
+  }
+
+  document.getElementById('yes').onclick = () => choosePromo(true);
+  document.getElementById('no').onclick = () => choosePromo(false);
+  document.getElementById('reset').onclick = reset;
+  document.getElementById('mode').onchange = e => { mode = e.target.value; reset(); };
+  document.getElementById('undo').onclick = () => {
+    // CPU戦では自分の手まで戻す
+    let n = mode === 'cpu' && S.turn === 0 ? 2 : 1;
+    while (n-- && history.length) ({ S, lastTo, lastText } = history.pop());
+    sel = null;
+    render();
+  };
+  reset();
+</script>
+</body>
+</html>
