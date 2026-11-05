@@ -455,7 +455,8 @@ function think(opts) {
   nodes = 0; aborted = false;
   const root = legalMoves();
   if (!root.length) return { move: 0, score: -MATE, depth: 0 };
-  if (root.length === 1) return { move: root[0], score: 0, depth: 0 };
+  // 指せる手が1つだけなら、評価値を出すために少しだけ読む
+  if (root.length === 1) deadline = Math.min(deadline, Date.now() + 100);
   // 弱いレベル：全部の手を同じ深さで点数付けして、乱数を足して選ぶ
   if (opts.noise) {
     let best = root[0], bestV = -INF, bestRaw = 0;
