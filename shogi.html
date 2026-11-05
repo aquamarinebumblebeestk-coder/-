@@ -698,7 +698,27 @@ onmessage = e => {
     lastTo = m.to;
     sel = null;
     render();
-    if (mode === 'cpu' && S.turn === 1 && hasLegal(S)) setTimeout(cpu, 300);
+    if (mode === 'cpu' && S.turn === 1 && !gameResult()) setTimeout(cpu, 300);
+  }
+
+  // 対局の結果（終わっていなければ空文字）。詰みと千日手（同じ局面が4回）を判定する
+  const posKey = S => S.turn + S.b.map(p => p ? p.o + p.t + (p.p ? '+' : '') : '.').join('') + JSON.stringify(S.h);
+  function gameResult() {
+    if (!hasLegal(S)) return `${S.turn ? '☗先手' : '☖後手'}の勝ち`;
+    const all = [...history.map(h => h.S), S], key = posKey(S);
+    const seen = all.map((s, i) => posKey(s) === key ? i : -1).filter(i => i >= 0);
+    if (seen.length < 4) return '';
+    // 連続王手の千日手は、王手をかけ続けた側の負け
+    for (const o of [0, 1]) {
+      let moves = 0, checks = 0;
+      for (let i = seen[0] + 1; i < all.length; i++) {
+        if (all[i].turn === o) continue;   // all[i] は o が指した直後の局面
+        moves++;
+        if (inCheck(all[i], all[i].turn)) checks++;
+      }
+      if (moves && moves === checks) return `連続王手の千日手で${o ? '☗先手' : '☖後手'}の勝ち`;
+    }
+    return '千日手で引き分け';
   }
 
   // CPU：機械学習で作った評価関数で先を読む。強さは読む深さ・時間と、手の選び方に混ぜる乱数で変える
@@ -717,21 +737,22 @@ onmessage = e => {
     const m = e.data.move, from = m & 127, to = m >> 7 & 127;
     play(from > 80 ? { drop: TYPE[from - 80], to } : { from, to, promo: !!(m >> 14) });
   };
+  const toPos = S => ({
+    board: S.b.map(p => p ? (CODE[p.t] + (p.p ? 8 : 0)) * (p.o ? -1 : 1) : 0),
+    hand: [0, 1].map(o => [0, ...'PLNSGBR'.split('').map(t => S.h[o][t])]),
+    side: S.turn,
+  });
   function cpu() {
     if (mode !== 'cpu' || S.turn !== 1) return;
-    const pos = {
-      board: S.b.map(p => p ? (CODE[p.t] + (p.p ? 8 : 0)) * (p.o ? -1 : 1) : 0),
-      hand: [0, 1].map(o => [0, ...'PLNSGBR'.split('').map(t => S.h[o][t])]),
-      side: 1,
-    };
     thinking = true;
     render();
-    worker.postMessage({ gen, pos, opts: LEVELS[+document.getElementById('level').value] });
+    // これまでの局面も渡して、CPUが千日手を判断できるようにする
+    worker.postMessage({ gen, pos: toPos(S), hist: history.map(h => toPos(h.S)), opts: LEVELS[+document.getElementById('level').value] });
   }
 
   function clickCell(i) {
     if (mode === 'cpu' && S.turn === 1) return;
-    if (!hasLegal(S)) return;
+    if (gameResult()) return;
     const pc = S.b[i];
     if (sel != null) {
       const ms = selMoves().filter(m => m.to === i);
@@ -791,8 +812,9 @@ onmessage = e => {
     }
     const side = S.turn ? '☖後手' : '☗先手';
     const prev = lastText ? lastText + '　' : '';
+    const result = gameResult();
     let msg;
-    if (!hasLegal(S)) msg = `${prev}まで、${S.turn ? '☗先手' : '☖後手'}の勝ち`;
+    if (result) msg = `${prev}まで、${result}`;
     else msg = `${prev}${side}の番${inCheck(S, S.turn) ? '（王手）' : ''}${thinking ? '　CPU考え中…' : ''}`;
     document.getElementById('status').textContent = msg;
   }

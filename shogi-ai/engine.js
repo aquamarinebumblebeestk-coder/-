@@ -162,8 +162,27 @@ function genMoves(capOnly) {
   return out;
 }
 
-const undoCap = new Int8Array(2048), undoLo = new Int32Array(2048), undoHi = new Int32Array(2048);
+const undoCap = new Int8Array(2048), undoLo = new Int32Array(2048), undoHi = new Int32Array(2048), undoNull = new Uint8Array(2048);
 let sp = 0;
+// 対局でこれまでに出た局面（hashKey の値）。千日手を避けるのに使う
+let gameHist = new Set();
+const hashKey = () => hashLo * 2097152 + (hashHi & 0x1fffff);
+function setHistory(keys) { gameHist = new Set(keys); }
+
+// 同じ局面が読み筋か対局の履歴に出ていれば千日手（引き分け）とみなす
+function isRepetition() {
+  for (let i = sp - 4; i >= 0; i -= 2) {
+    if (undoNull[i] || undoNull[i + 1]) return false;
+    if (undoLo[i] === hashLo && undoHi[i] === hashHi) return true;
+  }
+  return gameHist.has(hashKey());
+}
+
+function makeNull() {
+  undoLo[sp] = hashLo; undoHi[sp] = hashHi; undoCap[sp] = 0; undoNull[sp++] = 1;
+  side ^= 1; hashLo ^= ZSIDE_LO; hashHi ^= ZSIDE_HI;
+}
+function unmakeNull() { side ^= 1; sp--; hashLo = undoLo[sp]; hashHi = undoHi[sp]; }
 function xorHand(i) { hashLo ^= ZHLO[i * 20 + hand[i]]; hashHi ^= ZHHI[i * 20 + hand[i]]; }
 function xorPiece(p, sq) { hashLo ^= ZLO[zp(p, sq)]; hashHi ^= ZHI[zp(p, sq)]; }
 
@@ -174,7 +193,7 @@ function makeMove(m) {
     const t = from - 80, p = sign * t;
     xorHand(s * 8 + t); hand[s * 8 + t]--; xorHand(s * 8 + t);
     board[to] = p; xorPiece(p, to);
-    undoCap[sp++] = 0;
+    undoNull[sp] = 0; undoCap[sp++] = 0;
   } else {
     const p = board[from], cap = board[to];
     if (cap) {
@@ -187,7 +206,7 @@ function makeMove(m) {
     xorPiece(p, from); board[from] = 0;
     board[to] = np; xorPiece(np, to);
     if (np === sign * 8) king[s] = to;
-    undoCap[sp++] = cap;
+    undoNull[sp] = 0; undoCap[sp++] = cap;
   }
   side ^= 1; hashLo ^= ZSIDE_LO; hashHi ^= ZSIDE_HI;
 }
@@ -334,6 +353,18 @@ function checkTime() {
 
 function qsearch(alpha, beta, ply, qd) {
   checkTime();
+  // 王手されているときは「何もしない」ができないので、全部の応手を読む（応手が無ければ詰み）
+  if (qd < 6 && inCheck(side)) {
+    let best = -MATE + ply;
+    for (const m of genMoves(false)) {
+      makeMove(m);
+      if (!lastMoveLegal(m)) { unmakeMove(m); continue; }
+      const v = -qsearch(-beta, -Math.max(alpha, best), ply + 1, qd + 1);
+      unmakeMove(m);
+      if (v > best) { best = v; if (v >= beta) return v; }
+    }
+    return best;
+  }
   const stand = evaluate();
   if (stand >= beta || qd >= 6) return stand;
   if (stand > alpha) alpha = stand;
@@ -350,7 +381,8 @@ function qsearch(alpha, beta, ply, qd) {
   return alpha;
 }
 
-function search(depth, alpha, beta, ply) {
+function search(depth, alpha, beta, ply, allowNull = true) {
+  if (ply > 0 && isRepetition()) return 0;
   if (depth <= 0) return qsearch(alpha, beta, ply, 0);
   checkTime();
   if (aborted) return 0;
@@ -366,6 +398,15 @@ function search(depth, alpha, beta, ply) {
     }
   }
   const checked = inCheck(side);
+  const staticEval = checked ? -INF : evaluate();
+  // パスしても相手に追いつかれないほど良い局面なら、読みを打ち切る（null move pruning）
+  if (allowNull && !checked && depth >= 3 && ply > 0 && beta < MATE - 500 && staticEval >= beta) {
+    makeNull();
+    const v = -search(depth - 3 - (depth >= 7 ? 1 : 0), -beta, -beta + 1, ply + 1, false);
+    unmakeNull();
+    if (aborted) return 0;
+    if (v >= beta) return v > MATE - 500 ? beta : v;
+  }
   const moves = orderMoves(genMoves(false), ttm, ply);
   const a0 = alpha;
   let best = -INF, bestM = 0, legal = 0;
@@ -376,6 +417,8 @@ function search(depth, alpha, beta, ply) {
     const quiet = !undoCap[sp - 1] && !(m >> 14);
     const givesCheck = inCheck(side);
     const ext = givesCheck && depth <= 2 && ply < 12 ? 1 : 0;
+    // 残り1手で、静かな手を指しても評価値がαに届きそうにないなら読まない（futility pruning）
+    if (depth === 1 && legal > 1 && quiet && !checked && !givesCheck && staticEval + 250 <= alpha) { unmakeMove(m); continue; }
     let v;
     if (legal === 1) v = -search(depth - 1 + ext, -beta, -alpha, ply + 1);
     else {
@@ -442,7 +485,8 @@ function think(opts) {
       if (v > curV) { curV = v; curBest = m; }
       if (v > alpha) alpha = v;
     }
-    if (aborted) { if (curBest && curV > bestV) bestM = curBest; break; }
+    // 時間切れ：途中までで前の最善手より良い手が見つかっていればそれを使う（最初に読むのは前の最善手）
+    if (aborted) { if (curBest) bestM = curBest; break; }
     bestM = curBest; bestV = curV; done = d;
     order = [bestM, ...order.filter(m => m !== bestM)];
     if (bestV > MATE - 500 || bestV < -MATE + 500) break;
@@ -451,7 +495,7 @@ function think(opts) {
 }
 
 const Engine = {
-  NW, MATE, setPosition, getPosition, startPosition, legalMoves, makeMove, unmakeMove, inCheck: () => inCheck(side),
+  NW, MATE, setPosition, setHistory, hashKey, getPosition, startPosition, legalMoves, makeMove, unmakeMove, inCheck: () => inCheck(side),
   hasLegalMove, evaluate, features, think, clearTT, setWeights, materialWeights, encodeWeights, decodeWeights,
   get side() { return side; }, get nodes() { return nodes; }, isCapture: m => board[m >> 7 & 127] !== 0,
 };

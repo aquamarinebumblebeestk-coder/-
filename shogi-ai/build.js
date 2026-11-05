@@ -9,6 +9,7 @@ const code = `${engine}
 // ---- ここから Web Worker 用（build.js が追加）----
 setWeights(decodeWeights('${weights}'));
 onmessage = e => {
+  setHistory((e.data.hist || []).map(p => { setPosition(p); return hashKey(); }));
   setPosition(e.data.pos);
   const r = think(e.data.opts);
   postMessage({ gen: e.data.gen, move: r.move, score: r.score, depth: r.depth });
